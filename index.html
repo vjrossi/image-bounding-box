@@ -32,7 +32,7 @@
 
         .main-container {
             width: 100%;
-            max-width: 1200px; /* Increased max-width for side-by-side layout */
+            max-width: 1200px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -50,33 +50,32 @@
             margin: 0;
         }
 
-        /* NEW: Workspace container for side-by-side layout */
         .workspace {
             display: flex;
             flex-direction: row;
             gap: 2rem;
             width: 100%;
-            align-items: flex-start; /* Align items to the top */
+            align-items: flex-start;
         }
 
         #canvas-container {
             position: relative;
             border: 1px dashed var(--border-color);
-            border-radius: 8px;
+            /* border-radius: 8px; */ /* REMOVED */
             background-color: var(--surface);
             box-shadow: 0 4px 15px var(--shadow-color);
             display: flex;
             align-items: center;
             justify-content: center;
             min-height: 300px;
-            flex-grow: 1; /* Allow canvas container to grow */
-            overflow: hidden; /* Ensure canvas stays within rounded borders */
+            flex-grow: 1;
         }
         canvas {
             display: block;
             max-width: 100%;
             height: auto;
             cursor: crosshair;
+            /* border-radius: 8px; */ /* REMOVED */
         }
         
         .controls {
@@ -107,11 +106,11 @@
         #info {
             background-color: var(--surface);
             padding: 20px;
-            border-radius: 8px;
+            border-radius: 8px; /* Kept rounded corners here */
             border: 1px solid var(--border-color);
             box-shadow: 0 4px 15px var(--shadow-color);
-            flex-basis: 320px; /* Give info box a base width */
-            flex-shrink: 0; /* Prevent it from shrinking */
+            flex-basis: 320px;
+            flex-shrink: 0;
         }
         #info p {
             margin: 10px 0;
@@ -140,15 +139,14 @@
             to { transform: rotate(360deg); }
         }
         
-        /* NEW: Media query for responsiveness */
         @media (max-width: 900px) {
             .workspace {
-                flex-direction: column; /* Stack vertically on smaller screens */
+                flex-direction: column;
             }
             #info {
                 width: 100%;
-                max-width: 500px; /* Give it a max-width when stacked */
-                flex-basis: auto; /* Reset flex-basis */
+                max-width: 500px;
+                flex-basis: auto;
             }
             .main-container {
                 padding: 1rem;
@@ -170,7 +168,6 @@
             <span id="fileName">No file chosen</span>
         </div>
         
-        <!-- NEW: Workspace wrapper div -->
         <div class="workspace">
             <div id="canvas-container">
                 <canvas id="canvas"></canvas>
@@ -188,7 +185,7 @@
     </div>
 
     <script>
-        // --- JAVASCRIPT IS UNCHANGED FROM THE PREVIOUS VERSION ---
+        // JAVASCRIPT IS UNCHANGED
         const imageLoader = document.getElementById('imageLoader');
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
@@ -221,10 +218,9 @@
                     originalHeight = img.height;
                     sourceSizeEl.textContent = `${originalWidth} x ${originalHeight}`;
                     
-                    // Adjust canvas scaling logic slightly for flexbox
                     const canvasContainer = document.getElementById('canvas-container');
                     const maxWidth = canvasContainer.clientWidth;
-                    const maxHeight = window.innerHeight * 0.6; // Use viewport height as a constraint
+                    const maxHeight = window.innerHeight * 0.6;
                     scaleFactor = Math.min(maxWidth / originalWidth, maxHeight / originalHeight, 1);
 
                     canvas.width = originalWidth * scaleFactor;
