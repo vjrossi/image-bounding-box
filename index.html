@@ -1,4 +1,4 @@
-[⚠️ Suspicious Content] <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -28,6 +28,8 @@
             border: 1px solid #ccc;
             padding: 15px;
             border-radius: 5px;
+            width: 80%;
+            max-width: 400px; /* Give the info box a max width */
         }
         #info p {
             margin: 5px 0;
@@ -37,7 +39,7 @@
 <body>
 
     <h1>Image Bounding Box</h1>
-    <p>Upload an image and draw a bounding box. On mobile, long-press to start drawing.</p>
+    <p>Upload an image. Drag to draw a box. Single click/tap to clear.</p>
 
     <input type="file" id="imageLoader" name="imageLoader" accept="image/*"/>
 
@@ -46,6 +48,7 @@
     </div>
 
     <div id="info">
+        <p><strong>Cursor Position:</strong> <span id="cursorCoords">N/A</span></p> <!-- NEW: Cursor coordinate display -->
         <p><strong>Source Image Size:</strong> <span id="sourceSize">N/A</span></p>
         <p><strong>Top Left (x1, y1):</strong> <span id="topLeft">N/A</span></p>
         <p><strong>Bottom Right (x2, y2):</strong> <span id="bottomRight">N/A</span></p>
@@ -61,14 +64,17 @@
         const topLeftEl = document.getElementById('topLeft');
         const bottomRightEl = document.getElementById('bottomRight');
         const percentageEl = document.getElementById('percentage');
+        const cursorCoordsEl = document.getElementById('cursorCoords'); // NEW: Get cursor element
 
         let isDrawing = false;
+        let wasDrawing = false; // NEW: Flag to differentiate click from drag-release
         let startX, startY;
         let originalWidth, originalHeight;
         let scaleFactor;
-        let loadedImage = null; // --- FIX: Variable to hold the loaded image ---
+        let loadedImage = null;
 
         imageLoader.addEventListener('change', e => {
+            if (!e.target.files[0]) return;
             const reader = new FileReader();
             reader.onload = event => {
                 const img = new Image();
@@ -85,14 +91,12 @@
                     canvas.height = originalHeight * scaleFactor;
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-                    loadedImage = img; // --- FIX: Cache the image object in our variable ---
+                    loadedImage = img;
                     resetInfo();
                 }
                 img.src = event.target.result;
             }
-            if (e.target.files[0]) {
-                reader.readAsDataURL(e.target.files[0]);
-            }
+            reader.readAsDataURL(e.target.files[0]);
         });
 
         function getEventPos(canvas, evt) {
@@ -112,51 +116,81 @@
             startX = pos.x;
             startY = pos.y;
             isDrawing = true;
+            wasDrawing = false; // Reset wasDrawing flag
         }
 
         function draw(e) {
             if (!isDrawing) return;
             e.preventDefault();
+            wasDrawing = true; // NEW: If draw() is called, it means we are dragging
             const pos = getEventPos(canvas, e);
             const currentX = pos.x;
             const currentY = pos.y;
 
-            // --- FIX: Efficient drawing logic ---
-            ctx.clearRect(0, 0, canvas.width, canvas.height); // 1. Clear canvas
-
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             if (loadedImage) {
-                ctx.drawImage(loadedImage, 0, 0, canvas.width, canvas.height); // 2. Redraw cached image (fast)
+                ctx.drawImage(loadedImage, 0, 0, canvas.width, canvas.height);
             }
-
             ctx.strokeStyle = 'red';
             ctx.lineWidth = 2;
-            ctx.strokeRect(startX, startY, currentX - startX, currentY - startY); // 3. Draw the rectangle
+            ctx.strokeRect(startX, startY, currentX - startX, currentY - startY);
         }
 
         function stopDrawing(e) {
             if (!isDrawing) return;
-            e.preventDefault();
             isDrawing = false;
+
+            // NEW: If we never dragged, it was a click/tap, so clear it.
+            if (!wasDrawing) {
+                clearBoundingBox();
+                return;
+            }
+
+            e.preventDefault();
             const pos = getEventPos(canvas, e);
-            const endX = pos.x;
-            const endY = pos.y;
-            updateInfo(startX, startY, endX, endY);
+            updateInfo(startX, startY, pos.x, pos.y);
+        }
+
+        // NEW: Function to clear the box and reset info
+        function clearBoundingBox() {
+            if (loadedImage) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(loadedImage, 0, 0, canvas.width, canvas.height);
+            }
+            resetInfo();
         }
 
         // --- Event Listeners ---
         let longPressTimer;
-        const longPressDelay = 500; // ms
+        const longPressDelay = 300; // Shorter delay for better feel
+
+        // --- NEW: Listeners for showing cursor coordinates ---
+        canvas.addEventListener('mousemove', e => {
+            if (!loadedImage) return;
+            const pos = getEventPos(canvas, e);
+            const originalX = Math.round(pos.x / scaleFactor);
+            const originalY = Math.round(pos.y / scaleFactor);
+            cursorCoordsEl.textContent = `${originalX}, ${originalY}`;
+
+            // Also call the main draw function if drawing
+            if(isDrawing) draw(e);
+        });
+        canvas.addEventListener('mouseleave', () => {
+            cursorCoordsEl.textContent = 'N/A';
+            // Also stop drawing if the mouse leaves the canvas
+            if (isDrawing) stopDrawing({ preventDefault: () => {} });
+        });
+
 
         // Desktop
         canvas.addEventListener('mousedown', startDrawing);
-        canvas.addEventListener('mousemove', draw);
+        // canvas.addEventListener('mousemove', draw); // Now handled by the combined mousemove listener
         canvas.addEventListener('mouseup', stopDrawing);
-        canvas.addEventListener('mouseleave', () => { if (isDrawing) stopDrawing });
 
         // Mobile
         canvas.addEventListener('touchstart', e => {
-            e.preventDefault();
             clearTimeout(longPressTimer); // Clear any previous timer
+            wasDrawing = false; // Reset flag on new touch
             longPressTimer = setTimeout(() => {
                 startDrawing(e);
             }, longPressDelay);
@@ -171,9 +205,7 @@
 
         canvas.addEventListener('touchend', e => {
             clearTimeout(longPressTimer);
-            if(isDrawing) {
-                stopDrawing(e);
-            }
+            stopDrawing(e); // Let stopDrawing handle the logic for tap vs drag
         });
 
         function updateInfo(x1, y1, x2, y2) {
