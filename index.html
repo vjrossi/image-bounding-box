@@ -4,77 +4,189 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Image Bounding Box App</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --background: #1a1a1a;
+            --surface: #2c2c2c;
+            --primary: #4f86f7;
+            --on-surface: #e0e0e0;
+            --on-surface-secondary: #a0a0a0;
+            --border-color: #444;
+            --shadow-color: rgba(0, 0, 0, 0.2);
+        }
+
         body {
-            font-family: sans-serif;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background);
+            color: var(--on-surface);
             display: flex;
             flex-direction: column;
             align-items: center;
-            margin: 20px;
+            margin: 0;
+            padding: 2rem;
+            min-height: 100vh;
         }
+
+        .main-container {
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        header {
+            text-align: center;
+        }
+        header h1 {
+            margin-bottom: 0.5rem;
+        }
+        header p {
+            color: var(--on-surface-secondary);
+            margin: 0;
+        }
+
         #canvas-container {
             position: relative;
-            margin-bottom: 20px;
-            max-width: 100%;
-            touch-action: none; /* Prevents page scrolling on canvas touch */
+            border: 1px dashed var(--border-color);
+            border-radius: 8px;
+            background-color: var(--surface);
+            box-shadow: 0 4px 15px var(--shadow-color);
+            display: flex; /* Center the canvas */
+            align-items: center;
+            justify-content: center;
+            min-height: 300px; /* Give it a min height before image load */
         }
         canvas {
             display: block;
             max-width: 100%;
             height: auto;
             cursor: crosshair;
+            border-radius: 8px;
         }
-        #info {
-            border: 1px solid #ccc;
-            padding: 15px;
+        
+        /* Custom File Input */
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .file-input-label {
+            background-color: var(--primary);
+            color: white;
+            padding: 12px 20px;
             border-radius: 5px;
-            width: 80%;
-            max-width: 400px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.2s ease, transform 0.2s ease;
+        }
+        .file-input-label:hover {
+            background-color: #3a70e0;
+            transform: translateY(-2px);
+        }
+        #imageLoader {
+            display: none;
+        }
+        #fileName {
+            color: var(--on-surface-secondary);
+        }
+
+        #info {
+            background-color: var(--surface);
+            padding: 20px;
+            border-radius: 8px;
+            width: 100%;
+            max-width: 450px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 15px var(--shadow-color);
         }
         #info p {
-            margin: 5px 0;
+            margin: 10px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+        #info p strong {
+            color: var(--on-surface-secondary);
+        }
+        #info p span {
+            font-weight: 500;
+            color: var(--on-surface);
+        }
+
+        /* Loading Spinner */
+        #spinner {
+            display: none; /* Hidden by default */
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            border-left-color: var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            position: absolute; /* Place it over the canvas container */
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
 
-    <h1>Image Bounding Box</h1>
-    <p>Upload an image. Drag to draw a box. Single click/tap to clear.</p>
+    <div class="main-container">
+        <header>
+            <h1>Image Bounding Box</h1>
+            <p>Upload an image, then drag to draw a box. A single click/tap on the image will clear the box.</p>
+        </header>
 
-    <input type="file" id="imageLoader" name="imageLoader" accept="image/*"/>
+        <div class="controls">
+            <label for="imageLoader" class="file-input-label">Upload Image</label>
+            <input type="file" id="imageLoader" name="imageLoader" accept="image/*"/>
+            <span id="fileName">No file chosen</span>
+        </div>
+        
+        <div id="canvas-container">
+            <canvas id="canvas"></canvas>
+            <div id="spinner"></div>
+        </div>
 
-    <div id="canvas-container">
-        <canvas id="canvas"></canvas>
-    </div>
-
-    <div id="info">
-        <p><strong>Cursor Position:</strong> <span id="cursorCoords">N/A</span></p>
-        <p><strong>Source Image Size:</strong> <span id="sourceSize">N/A</span></p>
-        <p><strong>Top Left (x1, y1):</strong> <span id="topLeft">N/A</span></p>
-        <p><strong>Bottom Right (x2, y2):</strong> <span id="bottomRight">N/A</span></p>
-        <p><strong>Bounding Box to Image Size (%):</strong> <span id="percentage">N/A</span></p>
+        <div id="info">
+            <p><strong>Cursor Position:</strong> <span id="cursorCoords">N/A</span></p>
+            <p><strong>Source Image Size:</strong> <span id="sourceSize">N/A</span></p>
+            <p><strong>Top Left (x1, y1):</strong> <span id="topLeft">N/A</span></p>
+            <p><strong>Bottom Right (x2, y2):</strong> <span id="bottomRight">N/A</span></p>
+            <p><strong>Box to Image Size (%):</strong> <span id="percentage">N/A</span></p>
+        </div>
     </div>
 
     <script>
+        // All variable declarations
         const imageLoader = document.getElementById('imageLoader');
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-
         const sourceSizeEl = document.getElementById('sourceSize');
         const topLeftEl = document.getElementById('topLeft');
         const bottomRightEl = document.getElementById('bottomRight');
         const percentageEl = document.getElementById('percentage');
         const cursorCoordsEl = document.getElementById('cursorCoords');
+        const fileNameEl = document.getElementById('fileName');
+        const spinnerEl = document.getElementById('spinner');
 
-        let isDrawing = false;
-        let wasDrawing = false;
+        let isDrawing = false, wasDrawing = false;
         let startX, startY;
         let originalWidth, originalHeight;
-        let scaleFactor = 1; // FIX: Initialize scaleFactor to prevent errors
+        let scaleFactor = 1;
         let loadedImage = null;
 
         imageLoader.addEventListener('change', e => {
             if (!e.target.files[0]) return;
+            
+            fileNameEl.textContent = e.target.files[0].name;
+            spinnerEl.style.display = 'block'; // Show spinner
+            canvas.style.display = 'none'; // Hide canvas while loading
+            
             const reader = new FileReader();
             reader.onload = event => {
                 const img = new Image();
@@ -83,16 +195,18 @@
                     originalHeight = img.height;
                     sourceSizeEl.textContent = `${originalWidth} x ${originalHeight}`;
 
-                    const maxWidth = window.innerWidth * 0.9;
-                    const maxHeight = window.innerHeight * 0.6;
-                    scaleFactor = Math.min(maxWidth / originalWidth, maxHeight / originalHeight);
+                    const maxWidth = document.querySelector('.main-container').clientWidth;
+                    const maxHeight = window.innerHeight * 0.5;
+                    scaleFactor = Math.min(maxWidth / originalWidth, maxHeight / originalHeight, 1);
 
                     canvas.width = originalWidth * scaleFactor;
                     canvas.height = originalHeight * scaleFactor;
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
+                    
                     loadedImage = img;
-                    clearBoundingBox(); // Use clear to reset everything
+                    clearBoundingBox(); // Draw image and reset info
+
+                    spinnerEl.style.display = 'none'; // Hide spinner
+                    canvas.style.display = 'block'; // Show canvas
                 }
                 img.src = event.target.result;
             }
@@ -102,7 +216,6 @@
         function getEventPos(canvas, evt) {
             const rect = canvas.getBoundingClientRect();
             let clientX, clientY;
-
             if (evt.touches && evt.touches.length > 0) {
                 clientX = evt.touches[0].clientX;
                 clientY = evt.touches[0].clientY;
@@ -113,19 +226,14 @@
                 clientX = evt.clientX;
                 clientY = evt.clientY;
             }
-
-            let x = clientX - rect.left;
-            let y = clientY - rect.top;
-
-            // FIX: Clamp coordinates to be within the canvas boundaries. This prevents negative numbers and values too large.
-            x = Math.max(0, Math.min(x, canvas.width));
-            y = Math.max(0, Math.min(y, canvas.height));
-
+            let x = Math.max(0, Math.min(clientX - rect.left, canvas.width));
+            let y = Math.max(0, Math.min(clientY - rect.top, canvas.height));
             return { x, y };
         }
-
+        
         function startDrawing(e) {
             e.preventDefault();
+            if (!loadedImage) return;
             const pos = getEventPos(canvas, e);
             startX = pos.x;
             startY = pos.y;
@@ -138,12 +246,9 @@
             e.preventDefault();
             wasDrawing = true;
             const pos = getEventPos(canvas, e);
-
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            if (loadedImage) {
-                ctx.drawImage(loadedImage, 0, 0, canvas.width, canvas.height);
-            }
-            ctx.strokeStyle = 'red';
+            if (loadedImage) ctx.drawImage(loadedImage, 0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
             ctx.lineWidth = 2;
             ctx.strokeRect(startX, startY, pos.x - startX, pos.y - startY);
         }
@@ -151,14 +256,11 @@
         function stopDrawing(e) {
             if (!isDrawing) return;
             if (e.preventDefault) e.preventDefault();
-            
             isDrawing = false;
-
             if (!wasDrawing) {
                 clearBoundingBox();
                 return;
             }
-            
             const pos = getEventPos(canvas, e);
             updateInfo(startX, startY, pos.x, pos.y);
         }
@@ -174,9 +276,8 @@
         // --- Event Listeners ---
         let longPressTimer;
         const longPressDelay = 300;
-
+        
         canvas.addEventListener('mousemove', e => {
-            // FIX: Guard against running before an image is loaded
             if (!loadedImage || !scaleFactor) {
                 cursorCoordsEl.textContent = 'N/A';
                 return;
@@ -185,53 +286,35 @@
             const originalX = Math.round(pos.x / scaleFactor);
             const originalY = Math.round(pos.y / scaleFactor);
             cursorCoordsEl.textContent = `${originalX}, ${originalY}`;
-
             if(isDrawing) draw(e);
         });
-
-        canvas.addEventListener('mouseleave', () => {
-            cursorCoordsEl.textContent = 'N/A';
-        });
-
+        canvas.addEventListener('mouseleave', () => cursorCoordsEl.textContent = 'N/A');
         canvas.addEventListener('mousedown', startDrawing);
-
-        // FIX: Listen on the whole window. This reliably catches the end of a drag even if the user releases the mouse outside the canvas.
         window.addEventListener('mouseup', stopDrawing);
-
-        // Mobile Listeners
         canvas.addEventListener('touchstart', e => {
             clearTimeout(longPressTimer);
             wasDrawing = false;
             longPressTimer = setTimeout(() => startDrawing(e), longPressDelay);
         });
-
         canvas.addEventListener('touchmove', e => {
             clearTimeout(longPressTimer);
             if(isDrawing) draw(e);
         });
-
         canvas.addEventListener('touchend', e => {
             clearTimeout(longPressTimer);
             stopDrawing(e);
         });
 
         function updateInfo(x1, y1, x2, y2) {
-            // FIX: Guard against division by zero or NaN if values are not ready.
             if (!scaleFactor || !originalWidth || !originalHeight) return;
-
             const originalX1 = Math.round(Math.min(x1, x2) / scaleFactor);
             const originalY1 = Math.round(Math.min(y1, y2) / scaleFactor);
             const originalX2 = Math.round(Math.max(x1, x2) / scaleFactor);
             const originalY2 = Math.round(Math.max(y1, y2) / scaleFactor);
-
             topLeftEl.textContent = `${originalX1}, ${originalY1}`;
             bottomRightEl.textContent = `${originalX2}, ${originalY2}`;
-
-            const boxWidth = originalX2 - originalX1;
-            const boxHeight = originalY2 - originalY1;
-            const boxArea = boxWidth * boxHeight;
+            const boxArea = (originalX2 - originalX1) * (originalY2 - originalY1);
             const imageArea = originalWidth * originalHeight;
-
             if (imageArea > 0) {
                 const percentage = ((boxArea / imageArea) * 100).toFixed(2);
                 percentageEl.textContent = `${percentage}%`;
