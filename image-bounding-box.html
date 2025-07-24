@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Bounding Box App</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 20px;
+        }
+        #canvas-container {
+            position: relative;
+            margin-bottom: 20px;
+            max-width: 100%;
+        }
+        canvas {
+            display: block;
+            max-width: 100%;
+            height: auto;
+        }
+        #info {
+            border: 1px solid #ccc;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        #info p {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Image Bounding Box</h1>
+    <p>Upload an image and draw a bounding box. On mobile, long-press to start drawing.</p>
+
+    <input type="file" id="imageLoader" name="imageLoader"/>
+
+    <div id="canvas-container">
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <div id="info">
+        <p><strong>Source Image Size:</strong> <span id="sourceSize">N/A</span></p>
+        <p><strong>Top Left (x1, y1):</strong> <span id="topLeft">N/A</span></p>
+        <p><strong>Bottom Right (x2, y2):</strong> <span id="bottomRight">N/A</span></p>
+        <p><strong>Bounding Box to Image Size (%):</strong> <span id="percentage">N/A</span></p>
+    </div>
+
+    <script>
+        const imageLoader = document.getElementById('imageLoader');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        const sourceSizeEl = document.getElementById('sourceSize');
+        const topLeftEl = document.getElementById('topLeft');
+        const bottomRightEl = document.getElementById('bottomRight');
+        const percentageEl = document.getElementById('percentage');
+
+        let isDrawing = false;
+        let startX, startY;
+        let originalWidth, originalHeight;
+        let scaleFactor;
+
+        imageLoader.addEventListener('change', e => {
+            const reader = new FileReader();
+            reader.onload = event => {
+                const img = new Image();
+                img.onload = () => {
+                    originalWidth = img.width;
+                    originalHeight = img.height;
+                    sourceSizeEl.textContent = `${originalWidth} x ${originalHeight}`;
+
+                    // Adjust canvas to fit the screen while maintaining aspect ratio
+                    const maxWidth = window.innerWidth * 0.9;
+                    const maxHeight = window.innerHeight * 0.6;
+                    scaleFactor = Math.min(maxWidth / originalWidth, maxHeight / originalHeight);
+
+                    canvas.width = originalWidth * scaleFactor;
+                    canvas.height = originalHeight * scaleFactor;
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    resetInfo();
+                }
+                img.src = event.target.result;
+            }
+            reader.readAsDataURL(e.target.files[0]);
+        });
+
+        // --- Drawing Logic ---
+        let longPressTimer;
+        const longPressDelay = 500; // milliseconds
+
+        function getMousePos(canvas, evt) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: evt.clientX - rect.left,
+                y: evt.clientY - rect.top
+            };
+        }
+
+        function getTouchPos(canvas, touch) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: touch.clientX - rect.left,
+                y: touch.clientY - rect.top
+            };
+        }
+
+        function startDrawing(e) {
+            e.preventDefault();
+            isDrawing = true;
+            const pos = e.type.includes('mouse') ? getMousePos(canvas, e) : getTouchPos(canvas, e.touches[0]);
+            startX = pos.x;
+            startY = pos.y;
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            const pos = e.type.includes('mouse') ? getMousePos(canvas, e) : getTouchPos(canvas, e.touches[0]);
+            const currentX = pos.x;
+            const currentY = pos.y;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const img = new Image();
+            img.src = imageLoader.files.length > 0 ? URL.createObjectURL(imageLoader.files[0]) : '';
+            if (img.src) {
+                img.onload = () => {
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    ctx.strokeStyle = 'red';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(startX, startY, currentX - startX, currentY - startY);
+                }
+            } else {
+                 ctx.strokeStyle = 'red';
+                 ctx.lineWidth = 2;
+                 ctx.strokeRect(startX, startY, currentX - startX, currentY - startY);
+            }
+        }
+
+        function stopDrawing(e) {
+            if (!isDrawing) return;
+            isDrawing = false;
+            const pos = e.type.includes('mouse') ? getMousePos(canvas, e) : getTouchPos(canvas, e.changedTouches[0]);
+            const endX = pos.x;
+            const endY = pos.y;
+            updateInfo(startX, startY, endX, endY);
+        }
+
+
+        // --- Event Listeners ---
+        // Desktop
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseleave', () => {
+             if (isDrawing) {
+                isDrawing = false;
+                // Consider the last known position on the canvas as the end point
+                const rect = canvas.getBoundingClientRect();
+                const endX = Math.min(Math.max(0, lastMoveEvent.clientX - rect.left), canvas.width);
+                const endY = Math.min(Math.max(0, lastMoveEvent.clientY - rect.top), canvas.height);
+                updateInfo(startX, startY, endX, endY);
+            }
+        });
+
+        let lastMoveEvent; // to track the last mouse position
+        canvas.addEventListener('mousemove', e => {
+            lastMoveEvent = e;
+        });
+
+        // Mobile
+        canvas.addEventListener('touchstart', e => {
+            e.preventDefault();
+            longPressTimer = setTimeout(() => {
+                isDrawing = true;
+                const pos = getTouchPos(canvas, e.touches[0]);
+                startX = pos.x;
+                startY = pos.y;
+            }, longPressDelay);
+        });
+        canvas.addEventListener('touchmove', e => {
+            if (!isDrawing) return;
+            e.preventDefault();
+            draw(e);
+        });
+        canvas.addEventListener('touchend', e => {
+            clearTimeout(longPressTimer);
+            if (isDrawing) {
+                 e.preventDefault();
+                stopDrawing(e);
+            }
+            isDrawing = false;
+        });
+
+
+        // --- Info Calculation and Display ---
+        function updateInfo(x1, y1, x2, y2) {
+            const originalX1 = Math.round(Math.min(x1, x2) / scaleFactor);
+            const originalY1 = Math.round(Math.min(y1, y2) / scaleFactor);
+            const originalX2 = Math.round(Math.max(x1, x2) / scaleFactor);
+            const originalY2 = Math.round(Math.max(y1, y2) / scaleFactor);
+
+            topLeftEl.textContent = `${originalX1}, ${originalY1}`;
+            bottomRightEl.textContent = `${originalX2}, ${originalY2}`;
+
+            const boxWidth = originalX2 - originalX1;
+            const boxHeight = originalY2 - originalY1;
+            const boxArea = boxWidth * boxHeight;
+            const imageArea = originalWidth * originalHeight;
+            const percentage = ((boxArea / imageArea) * 100).toFixed(2);
+            percentageEl.textContent = `${percentage}%`;
+        }
+
+        function resetInfo() {
+            topLeftEl.textContent = 'N/A';
+            bottomRightEl.textContent = 'N/A';
+            percentageEl.textContent = 'N/A';
+        }
+    </script>
+
+</body>
+</html>
