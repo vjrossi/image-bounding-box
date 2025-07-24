@@ -29,7 +29,7 @@
             padding: 15px;
             border-radius: 5px;
             width: 80%;
-            max-width: 400px; /* Give the info box a max width */
+            max-width: 400px;
         }
         #info p {
             margin: 5px 0;
@@ -48,7 +48,7 @@
     </div>
 
     <div id="info">
-        <p><strong>Cursor Position:</strong> <span id="cursorCoords">N/A</span></p> <!-- NEW: Cursor coordinate display -->
+        <p><strong>Cursor Position:</strong> <span id="cursorCoords">N/A</span></p>
         <p><strong>Source Image Size:</strong> <span id="sourceSize">N/A</span></p>
         <p><strong>Top Left (x1, y1):</strong> <span id="topLeft">N/A</span></p>
         <p><strong>Bottom Right (x2, y2):</strong> <span id="bottomRight">N/A</span></p>
@@ -64,13 +64,13 @@
         const topLeftEl = document.getElementById('topLeft');
         const bottomRightEl = document.getElementById('bottomRight');
         const percentageEl = document.getElementById('percentage');
-        const cursorCoordsEl = document.getElementById('cursorCoords'); // NEW: Get cursor element
+        const cursorCoordsEl = document.getElementById('cursorCoords');
 
         let isDrawing = false;
-        let wasDrawing = false; // NEW: Flag to differentiate click from drag-release
+        let wasDrawing = false;
         let startX, startY;
         let originalWidth, originalHeight;
-        let scaleFactor;
+        let scaleFactor = 1; // FIX: Initialize scaleFactor to prevent errors
         let loadedImage = null;
 
         imageLoader.addEventListener('change', e => {
@@ -92,7 +92,7 @@
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
                     loadedImage = img;
-                    resetInfo();
+                    clearBoundingBox(); // Use clear to reset everything
                 }
                 img.src = event.target.result;
             }
@@ -101,13 +101,27 @@
 
         function getEventPos(canvas, evt) {
             const rect = canvas.getBoundingClientRect();
+            let clientX, clientY;
+
             if (evt.touches && evt.touches.length > 0) {
-                return { x: evt.touches[0].clientX - rect.left, y: evt.touches[0].clientY - rect.top };
+                clientX = evt.touches[0].clientX;
+                clientY = evt.touches[0].clientY;
+            } else if (evt.changedTouches && evt.changedTouches.length > 0) {
+                clientX = evt.changedTouches[0].clientX;
+                clientY = evt.changedTouches[0].clientY;
+            } else {
+                clientX = evt.clientX;
+                clientY = evt.clientY;
             }
-            if (evt.changedTouches && evt.changedTouches.length > 0) {
-                return { x: evt.changedTouches[0].clientX - rect.left, y: evt.changedTouches[0].clientY - rect.top };
-            }
-            return { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
+
+            let x = clientX - rect.left;
+            let y = clientY - rect.top;
+
+            // FIX: Clamp coordinates to be within the canvas boundaries. This prevents negative numbers and values too large.
+            x = Math.max(0, Math.min(x, canvas.width));
+            y = Math.max(0, Math.min(y, canvas.height));
+
+            return { x, y };
         }
 
         function startDrawing(e) {
@@ -116,16 +130,14 @@
             startX = pos.x;
             startY = pos.y;
             isDrawing = true;
-            wasDrawing = false; // Reset wasDrawing flag
+            wasDrawing = false;
         }
 
         function draw(e) {
             if (!isDrawing) return;
             e.preventDefault();
-            wasDrawing = true; // NEW: If draw() is called, it means we are dragging
+            wasDrawing = true;
             const pos = getEventPos(canvas, e);
-            const currentX = pos.x;
-            const currentY = pos.y;
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             if (loadedImage) {
@@ -133,25 +145,24 @@
             }
             ctx.strokeStyle = 'red';
             ctx.lineWidth = 2;
-            ctx.strokeRect(startX, startY, currentX - startX, currentY - startY);
+            ctx.strokeRect(startX, startY, pos.x - startX, pos.y - startY);
         }
 
         function stopDrawing(e) {
             if (!isDrawing) return;
+            if (e.preventDefault) e.preventDefault();
+            
             isDrawing = false;
 
-            // NEW: If we never dragged, it was a click/tap, so clear it.
             if (!wasDrawing) {
                 clearBoundingBox();
                 return;
             }
-
-            e.preventDefault();
+            
             const pos = getEventPos(canvas, e);
             updateInfo(startX, startY, pos.x, pos.y);
         }
 
-        // NEW: Function to clear the box and reset info
         function clearBoundingBox() {
             if (loadedImage) {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -162,53 +173,52 @@
 
         // --- Event Listeners ---
         let longPressTimer;
-        const longPressDelay = 300; // Shorter delay for better feel
+        const longPressDelay = 300;
 
-        // --- NEW: Listeners for showing cursor coordinates ---
         canvas.addEventListener('mousemove', e => {
-            if (!loadedImage) return;
+            // FIX: Guard against running before an image is loaded
+            if (!loadedImage || !scaleFactor) {
+                cursorCoordsEl.textContent = 'N/A';
+                return;
+            }
             const pos = getEventPos(canvas, e);
             const originalX = Math.round(pos.x / scaleFactor);
             const originalY = Math.round(pos.y / scaleFactor);
             cursorCoordsEl.textContent = `${originalX}, ${originalY}`;
 
-            // Also call the main draw function if drawing
             if(isDrawing) draw(e);
         });
+
         canvas.addEventListener('mouseleave', () => {
             cursorCoordsEl.textContent = 'N/A';
-            // Also stop drawing if the mouse leaves the canvas
-            if (isDrawing) stopDrawing({ preventDefault: () => {} });
         });
 
-
-        // Desktop
         canvas.addEventListener('mousedown', startDrawing);
-        // canvas.addEventListener('mousemove', draw); // Now handled by the combined mousemove listener
-        canvas.addEventListener('mouseup', stopDrawing);
 
-        // Mobile
+        // FIX: Listen on the whole window. This reliably catches the end of a drag even if the user releases the mouse outside the canvas.
+        window.addEventListener('mouseup', stopDrawing);
+
+        // Mobile Listeners
         canvas.addEventListener('touchstart', e => {
-            clearTimeout(longPressTimer); // Clear any previous timer
-            wasDrawing = false; // Reset flag on new touch
-            longPressTimer = setTimeout(() => {
-                startDrawing(e);
-            }, longPressDelay);
+            clearTimeout(longPressTimer);
+            wasDrawing = false;
+            longPressTimer = setTimeout(() => startDrawing(e), longPressDelay);
         });
 
         canvas.addEventListener('touchmove', e => {
-            clearTimeout(longPressTimer); // If they move, it's not a long press
-            if(isDrawing) {
-                draw(e);
-            }
+            clearTimeout(longPressTimer);
+            if(isDrawing) draw(e);
         });
 
         canvas.addEventListener('touchend', e => {
             clearTimeout(longPressTimer);
-            stopDrawing(e); // Let stopDrawing handle the logic for tap vs drag
+            stopDrawing(e);
         });
 
         function updateInfo(x1, y1, x2, y2) {
+            // FIX: Guard against division by zero or NaN if values are not ready.
+            if (!scaleFactor || !originalWidth || !originalHeight) return;
+
             const originalX1 = Math.round(Math.min(x1, x2) / scaleFactor);
             const originalY1 = Math.round(Math.min(y1, y2) / scaleFactor);
             const originalX2 = Math.round(Math.max(x1, x2) / scaleFactor);
@@ -225,6 +235,8 @@
             if (imageArea > 0) {
                 const percentage = ((boxArea / imageArea) * 100).toFixed(2);
                 percentageEl.textContent = `${percentage}%`;
+            } else {
+                percentageEl.textContent = '0%';
             }
         }
 
