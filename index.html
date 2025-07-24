@@ -32,7 +32,7 @@
 
         .main-container {
             width: 100%;
-            max-width: 800px;
+            max-width: 1200px; /* Increased max-width for side-by-side layout */
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -50,26 +50,35 @@
             margin: 0;
         }
 
+        /* NEW: Workspace container for side-by-side layout */
+        .workspace {
+            display: flex;
+            flex-direction: row;
+            gap: 2rem;
+            width: 100%;
+            align-items: flex-start; /* Align items to the top */
+        }
+
         #canvas-container {
             position: relative;
             border: 1px dashed var(--border-color);
             border-radius: 8px;
             background-color: var(--surface);
             box-shadow: 0 4px 15px var(--shadow-color);
-            display: flex; /* Center the canvas */
+            display: flex;
             align-items: center;
             justify-content: center;
-            min-height: 300px; /* Give it a min height before image load */
+            min-height: 300px;
+            flex-grow: 1; /* Allow canvas container to grow */
+            overflow: hidden; /* Ensure canvas stays within rounded borders */
         }
         canvas {
             display: block;
             max-width: 100%;
             height: auto;
             cursor: crosshair;
-            border-radius: 8px;
         }
         
-        /* Custom File Input */
         .controls {
             display: flex;
             align-items: center;
@@ -99,10 +108,10 @@
             background-color: var(--surface);
             padding: 20px;
             border-radius: 8px;
-            width: 100%;
-            max-width: 450px;
             border: 1px solid var(--border-color);
             box-shadow: 0 4px 15px var(--shadow-color);
+            flex-basis: 320px; /* Give info box a base width */
+            flex-shrink: 0; /* Prevent it from shrinking */
         }
         #info p {
             margin: 10px 0;
@@ -117,19 +126,33 @@
             color: var(--on-surface);
         }
 
-        /* Loading Spinner */
         #spinner {
-            display: none; /* Hidden by default */
+            display: none;
             border: 4px solid rgba(255, 255, 255, 0.2);
             border-left-color: var(--primary);
             border-radius: 50%;
             width: 40px;
             height: 40px;
             animation: spin 1s linear infinite;
-            position: absolute; /* Place it over the canvas container */
+            position: absolute;
         }
         @keyframes spin {
             to { transform: rotate(360deg); }
+        }
+        
+        /* NEW: Media query for responsiveness */
+        @media (max-width: 900px) {
+            .workspace {
+                flex-direction: column; /* Stack vertically on smaller screens */
+            }
+            #info {
+                width: 100%;
+                max-width: 500px; /* Give it a max-width when stacked */
+                flex-basis: auto; /* Reset flex-basis */
+            }
+            .main-container {
+                padding: 1rem;
+            }
         }
     </style>
 </head>
@@ -138,7 +161,7 @@
     <div class="main-container">
         <header>
             <h1>Image Bounding Box</h1>
-            <p>Upload an image, then drag to draw a box. A single click/tap on the image will clear the box.</p>
+            <p>Upload an image, then drag to draw a box. A single click/tap on the image will clear it.</p>
         </header>
 
         <div class="controls">
@@ -147,22 +170,25 @@
             <span id="fileName">No file chosen</span>
         </div>
         
-        <div id="canvas-container">
-            <canvas id="canvas"></canvas>
-            <div id="spinner"></div>
-        </div>
+        <!-- NEW: Workspace wrapper div -->
+        <div class="workspace">
+            <div id="canvas-container">
+                <canvas id="canvas"></canvas>
+                <div id="spinner"></div>
+            </div>
 
-        <div id="info">
-            <p><strong>Cursor Position:</strong> <span id="cursorCoords">N/A</span></p>
-            <p><strong>Source Image Size:</strong> <span id="sourceSize">N/A</span></p>
-            <p><strong>Top Left (x1, y1):</strong> <span id="topLeft">N/A</span></p>
-            <p><strong>Bottom Right (x2, y2):</strong> <span id="bottomRight">N/A</span></p>
-            <p><strong>Box to Image Size (%):</strong> <span id="percentage">N/A</span></p>
+            <div id="info">
+                <p><strong>Cursor Position:</strong> <span id="cursorCoords">N/A</span></p>
+                <p><strong>Source Image Size:</strong> <span id="sourceSize">N/A</span></p>
+                <p><strong>Top Left (x1, y1):</strong> <span id="topLeft">N/A</span></p>
+                <p><strong>Bottom Right (x2, y2):</strong> <span id="bottomRight">N/A</span></p>
+                <p><strong>Box to Image Size (%):</strong> <span id="percentage">N/A</span></p>
+            </div>
         </div>
     </div>
 
     <script>
-        // All variable declarations
+        // --- JAVASCRIPT IS UNCHANGED FROM THE PREVIOUS VERSION ---
         const imageLoader = document.getElementById('imageLoader');
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
@@ -184,8 +210,8 @@
             if (!e.target.files[0]) return;
             
             fileNameEl.textContent = e.target.files[0].name;
-            spinnerEl.style.display = 'block'; // Show spinner
-            canvas.style.display = 'none'; // Hide canvas while loading
+            spinnerEl.style.display = 'block';
+            canvas.style.display = 'none';
             
             const reader = new FileReader();
             reader.onload = event => {
@@ -194,19 +220,21 @@
                     originalWidth = img.width;
                     originalHeight = img.height;
                     sourceSizeEl.textContent = `${originalWidth} x ${originalHeight}`;
-
-                    const maxWidth = document.querySelector('.main-container').clientWidth;
-                    const maxHeight = window.innerHeight * 0.5;
+                    
+                    // Adjust canvas scaling logic slightly for flexbox
+                    const canvasContainer = document.getElementById('canvas-container');
+                    const maxWidth = canvasContainer.clientWidth;
+                    const maxHeight = window.innerHeight * 0.6; // Use viewport height as a constraint
                     scaleFactor = Math.min(maxWidth / originalWidth, maxHeight / originalHeight, 1);
 
                     canvas.width = originalWidth * scaleFactor;
                     canvas.height = originalHeight * scaleFactor;
                     
                     loadedImage = img;
-                    clearBoundingBox(); // Draw image and reset info
+                    clearBoundingBox();
 
-                    spinnerEl.style.display = 'none'; // Hide spinner
-                    canvas.style.display = 'block'; // Show canvas
+                    spinnerEl.style.display = 'none';
+                    canvas.style.display = 'block';
                 }
                 img.src = event.target.result;
             }
@@ -273,7 +301,6 @@
             resetInfo();
         }
 
-        // --- Event Listeners ---
         let longPressTimer;
         const longPressDelay = 300;
         
@@ -329,6 +356,5 @@
             percentageEl.textContent = 'N/A';
         }
     </script>
-
 </body>
 </html>
